@@ -1,6 +1,6 @@
 # dsh-desktop-restart
 
-[English](README.md) | [中文](README.zh.md)
+English | [中文](README.zh.md)
 
 Two buttons in the sidebar foot of the **DeepSeek Harness desktop app**: reload the interface, or restart the entire application (app + Host).
 
