@@ -1,5 +1,7 @@
 # dsh-desktop-restart
 
+[English](README.md) | [中文](README.zh.md)
+
 Two buttons in the sidebar foot of the **DeepSeek Harness desktop app**: reload the interface, or restart the entire application (app + Host).
 
 The production desktop shell ships no *Reload Page* menu item and no built-in accelerator for it, and it exposes no way to relaunch itself — `app.relaunch()` lives in the Electron main process and is wired only to crash recovery. This plugin adds both, as ordinary sidebar actions.
@@ -113,15 +115,3 @@ Everything the helper and the watchdog do is appended to `%TEMP%\dsh-desktop-res
 ## License
 
 MIT. See [LICENSE](LICENSE).
-
----
-
-## 中文说明
-
-给 DeepSeek Harness 桌面端侧栏加两个按钮：**刷新界面**（只重载页面与客户端插件，Host 不停、正在跑的回合不中断）和**重启应用**（硬杀全部进程后从同一路径拉起，需二次确认）。
-
-- 仅支持 Windows 桌面端；在 `dsh web` 下按钮会退化为刷新页面。
-- **必须把包名加进 `dsh.profile.bundles` 才会加载**——只装进 `dependencies` 不会有任何效果，也不报错。
-- 重启是硬杀，正在进行的回合会中断；会话历史与已落盘内容不受影响。
-- 排障先看 `%TEMP%\dsh-desktop-restart.log`。
-- `POST /desktop-restart/diagnose` 可以只武装看门狗、不杀进程，用来验证链路是否完好。
