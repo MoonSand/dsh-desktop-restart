@@ -1,0 +1,47 @@
+{
+  "name": "@moonsand/dsh-desktop-restart",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Sidebar-foot Reload UI and Restart App buttons: reload refreshes the interface and client plugins only, restart relaunches the DeepSeek Harness desktop app together with its Host.",
+  "license": "MIT",
+  "author": "MoonSand",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/MoonSand/dsh-desktop-restart.git"
+  },
+  "homepage": "https://github.com/MoonSand/dsh-desktop-restart#readme",
+  "keywords": [
+    "dsh",
+    "dsh-plugin",
+    "deepseek-harness",
+    "electron",
+    "restart",
+    "reload"
+  ],
+  "exports": {
+    ".": "./index.js",
+    "./client": "./client.js",
+    "./locale/*.json": "./locale/*.json",
+    "./icon": "./icon.svg"
+  },
+  "files": [
+    "index.js",
+    "client.js",
+    "cordis.patch.yml",
+    "locale/*.json",
+    "icon.svg"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "immediately": true,
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-sidebar"
+      ]
+    }
+  }
+}

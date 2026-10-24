@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "DSH Desktop 重启",
+    "description": "在侧边栏底部加「刷新界面」与「重启应用」两个按钮：刷新只重载界面与客户端插件，重启会重启整个 DeepSeek Harness（应用与 Host）。"
+  }
+}
