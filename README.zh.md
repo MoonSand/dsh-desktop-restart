@@ -23,17 +23,23 @@
 
 ## 安装
 
-插件未发布到 npm，从本地目录安装：
+从 npm 安装：
 
 ```powershell
-# 1. 在 profile 的 dependencies 里登记包（路径必须是绝对路径）
-#    "dependencies": { "@moonsand/dsh-desktop-restart": "link:D:/path/to/dsh-desktop-restart" }
+pnpm add @moonsand/dsh-desktop-restart
+```
 
-# 2. 让包管理器建立链接
+或者从本地目录安装（开发时）：
+
+```powershell
+# "dependencies": { "@moonsand/dsh-desktop-restart": "link:D:/path/to/dsh-desktop-restart" }
 pnpm install
+```
 
-# 3. 把包名加进 dsh.profile.bundles —— 这一条才真正决定加载
-#    "dsh": { "profile": { "bundles": [ ..., "@moonsand/dsh-desktop-restart" ] } }
+无论哪种方式，都必须把包名登记进 bundle —— **这一条才真正决定加载**：
+
+```json
+"dsh": { "profile": { "bundles": [ ..., "@moonsand/dsh-desktop-restart" ] } }
 ```
 
 **只装进 `dependencies` 而不进 `dsh.profile.bundles`，插件会静默不加载**：不报错、也不出按钮。加好 bundle 条目后重启应用。

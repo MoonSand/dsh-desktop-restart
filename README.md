@@ -23,17 +23,23 @@ The production desktop shell ships no *Reload Page* menu item and no built-in ac
 
 ## Install
 
-The plugin is not published to npm. Install it from a local checkout:
+From npm:
 
 ```powershell
-# 1. put the package in the profile's dependencies (the path must be absolute)
-#    "dependencies": { "@moonsand/dsh-desktop-restart": "link:D:/path/to/dsh-desktop-restart" }
+pnpm add @moonsand/dsh-desktop-restart
+```
 
-# 2. let the package manager link it
+From a local checkout, while developing:
+
+```powershell
+# "dependencies": { "@moonsand/dsh-desktop-restart": "link:D:/path/to/dsh-desktop-restart" }
 pnpm install
+```
 
-# 3. add the package name to dsh.profile.bundles — this is what actually loads it
-#    "dsh": { "profile": { "bundles": [ ..., "@moonsand/dsh-desktop-restart" ] } }
+Either way, the package must also be registered as a bundle — **that entry is what actually loads it**:
+
+```json
+"dsh": { "profile": { "bundles": [ ..., "@moonsand/dsh-desktop-restart" ] } }
 ```
 
 A package that is installed but **absent from `dsh.profile.bundles` silently does nothing**: it produces no error and no button. Add the bundle entry, then restart the app.
