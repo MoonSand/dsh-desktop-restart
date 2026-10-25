@@ -104,7 +104,7 @@ pnpm install
 ## 已知限制
 
 - **重启是硬杀**（`TerminateProcess`），正在进行的回合会中断。会话历史与已落盘内容不受影响。
-- **包管理器正在往 profile 里装东西时拒绝重启**（`409 installing`）。两路独立信号都查：①lockfile 或 `node_modules/.modules.yaml` 在最近 30 秒内被写过——这抓的是安装**刚结束**那一刻（lockfile 是最后才写的）；②有命令行里带 `pnpm` 的 `node` 进程在跑——这抓的是安装**还在进行中**、lockfile 尚未出现的那段。两路都是尽力而为，判不出来就放行。
+- **包管理器正在往 profile 里装东西时拒绝重启**（`409 installing`）。三路信号都查：①插件管理器自己广播的 `plugin-manager/install-state`（`installing` / `cancelling` / `applying`）——这条最权威，但它不发“完成”事件，所以相位十分钟后自动过期；②lockfile 或 `node_modules/.modules.yaml` 在最近 30 秒内被写过，抓的是安装**刚结束**那一刻（lockfile 是最后才写的）；③兜底是有命令行里带 `pnpm` 的 `node` 进程在跑。三路都是尽力而为，判不出来就放行。
 - 只支持 Windows 桌面端。在普通 `dsh web` 下路由回 `409 not-desktop`，按钮退化为刷新页面。
 - 计划任务通道被策略禁用时，帮手会退化为直接启动 PowerShell，可能闪一下控制台窗口；日志标记 `(direct powershell)`。
 - 没有键盘快捷键。桌面端会把快捷键组合交给可信原生桥、在页面处理器之前拦截，页面级监听看不到；改走产品快捷键服务又会引入本插件并不需要的依赖。
