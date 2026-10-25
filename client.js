@@ -350,9 +350,6 @@ window.__ModuleLoader__.load({
         }
         const reason = answer.body?.reason
         if (reason === 'installing') {
-          // Not a failure: the Host refused on purpose because an install is running.
-          // `blocked` renders it as greyed-out rather than red, and the phase expires
-          // on its own so the button comes back without a retry.
           publishPhase('blocked')
           setNote(t('installing'))
           return
