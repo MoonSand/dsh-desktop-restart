@@ -88,26 +88,34 @@ if (process.platform === 'win32') {
 }
 
 // ---------------------------------------------------------------------------
-// 2. The install guard: fail-open, and it only trips on a freshly written
-//    manifest in a profile it can actually locate.
+// 2. The install guard: two signals, fail-open, and it only trips when one of
+//    them actually says an install is in flight.
 // ---------------------------------------------------------------------------
 {
   const dir = mkdtempSync(join(tmpdir(), 'dsh-restart-smoke-'))
   const previous = process.env.DSH_PROFILE_DIR
+  // Injected so this test never spawns PowerShell: it asserts the decision, not
+  // the probe.
+  const noManager = async () => false
+  const runningManager = async () => true
   try {
     process.env.DSH_PROFILE_DIR = dir
-    check(host.installInProgress() === false, 'an empty profile must not block a restart')
+    check((await host.installInProgress(noManager)) === false, 'an empty profile with no package manager must not block')
 
     const lock = join(dir, 'pnpm-lock.yaml')
     writeFileSync(lock, 'lockfileVersion: 9\n')
-    check(host.installInProgress() === true, 'a fresh lockfile must look like an install in flight')
+    check((await host.installInProgress(noManager)) === true, 'a fresh lockfile must look like an install in flight')
 
     const past = new Date(Date.now() - 120_000)
     utimesSync(lock, past, past)
-    check(host.installInProgress() === false, 'a stale lockfile must not block a restart')
+    check((await host.installInProgress(noManager)) === false, 'a stale lockfile with no package manager must not block')
+
+    // The window the lockfile cannot cover: pnpm is still running and has not
+    // written the lockfile yet.
+    check((await host.installInProgress(runningManager)) === true, 'a live package manager must block without a fresh lockfile')
 
     delete process.env.DSH_PROFILE_DIR
-    check(host.installInProgress() === false, 'an unknown profile must fail open, not block')
+    check((await host.installInProgress(noManager)) === false, 'an unknown profile with no package manager must fail open')
   } finally {
     if (previous === undefined) delete process.env.DSH_PROFILE_DIR
     else process.env.DSH_PROFILE_DIR = previous
