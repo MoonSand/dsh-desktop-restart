@@ -1,10 +1,15 @@
 /**
- * Sidebar-foot restart action for the DeepSeek Harness desktop application.
+ * Sidebar-foot reload and restart actions for the DeepSeek Harness desktop application.
  *
- * The button sits in the sidebar foot, right-aligned above the account row, and asks the
- * Host half (`POST /desktop-restart/restart`) to restart the application together with
- * its Host. The Host answers `409 not-desktop` outside the desktop shell, in which case
- * this action falls back to reloading the page and says so.
+ * Both buttons live in a single `sidebar.footer.action` registration. The host renders one
+ * flex item per registration and its footer container does not wrap, so registering two
+ * actions makes this plugin occupy twice the width it needs — enough for a third-party
+ * footer button to push everything onto separate lines. One registration, two buttons
+ * inside it, keeps the pair together and halves the footprint.
+ *
+ * The restart button asks the Host half (`POST /desktop-restart/restart`) to restart the
+ * application together with its Host. The Host answers `409 not-desktop` outside the
+ * desktop shell, in which case the button falls back to reloading the page and says so.
  *
  * @module @moonsand/dsh-desktop-restart/client
  */
@@ -20,26 +25,25 @@ window.__ModuleLoader__.load({
     const WATCHDOG_MS = 20000
 
     /**
-     * Restart phase shared by both footer actions.
+     * Restart phase shared by both buttons.
      *
-     * The reload and restart actions are separate slot registrations, so React state inside
-     * one is invisible to the other. While a restart is in flight the reload button must be
-     * disabled: reloading the page mid-kill would race the watchdog and could leave the
-     * window blank until the relaunch wins. A module-level store with a subscriber set is
-     * the smallest thing that makes that visible across both components.
+     * While a restart is in flight the reload button must be disabled: reloading the page
+     * mid-kill would race the watchdog and could leave the window blank until the relaunch
+     * wins. The two buttons are separate components, so the phase lives here in a
+     * module-level store rather than in either component's state.
      */
     const restartPhase = { value: 'idle', since: 0, listeners: new Set() }
 
     /**
      * Read the shared phase, healing a value that outlived its attempt.
      *
-     * A hot module swap can remount the actions while a phase is still set, and a request
+     * A hot module swap can remount the buttons while a phase is still set, and a request
      * that never got an answer leaves nothing to clear it. Each phase therefore carries its
      * own lifetime — the arming window for `confirm`, the watchdog window for `restarting`
      * — and anything older is reported as idle, so the reload button cannot stay disabled
      * forever and the restart button cannot come back stuck on a prompt.
      *
-     * @returns The phase both footer actions should render.
+     * @returns The phase both buttons should render.
      */
     function currentPhase() {
       const spent = Date.now() - restartPhase.since
@@ -52,7 +56,7 @@ window.__ModuleLoader__.load({
     }
 
     /**
-     * Publish a phase to every mounted footer action.
+     * Publish a phase to both mounted buttons.
      *
      * @param next - One of `idle`, `confirm`, `restarting`, `blocked`, `failed`.
      */
@@ -94,7 +98,7 @@ window.__ModuleLoader__.load({
       stillAlive: '应用没有重启，请手动重启，或再点一次',
       notDesktop: '当前不是桌面端，改为刷新界面',
       unreachable: '联系不到 Host，改为刷新界面',
-      installing: '正在安装插件，完成后再试',
+      installing: '安装插件中',
     }
     const en = {
       label: 'Restart app',
@@ -110,12 +114,11 @@ window.__ModuleLoader__.load({
       stillAlive: 'The app did not restart — restart it manually, or click again',
       notDesktop: 'Not the desktop app — reloading the page instead',
       unreachable: 'The Host did not answer — reloading the page instead',
-      installing: 'Installing plugins — try again when it finishes',
+      installing: 'Installing…',
     }
 
     const CSS = `
-.dsr-slot{display:flex;align-items:center;justify-content:flex-start;margin-right:0;min-width:0;padding:0 2px 2px 0}
-.dsr-slot.is-trailing{margin-right:auto;padding-right:6px}
+.dsr-group{display:flex;align-items:center;gap:4px;min-width:0;max-width:100%}
 .dsr-btn{display:inline-flex;align-items:center;gap:6px;box-sizing:border-box;height:26px;max-width:100%;padding:0 8px;
   border:0;border-radius:var(--dsw-radius-md,8px);background:transparent;color:var(--dsw-alias-label-primary,inherit);
   font:inherit;font-size:12px;line-height:1;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -187,55 +190,6 @@ window.__ModuleLoader__.load({
     }
 
     /**
-     * The sidebar-foot reload action: one click reloads the page, no Host call.
-     *
-     * This is the cheap half of the pair. A client plugin, a stylesheet, or a locale change
-     * arrives with the next page load, and reloading leaves the Host — and every running
-     * turn — untouched.
-     *
-     * It is disabled while the other button is restarting: the watchdog kills the
-     * application a moment after the Host answers, and a page reload racing that kill can
-     * leave the window blank until the relaunch wins.
-     *
-     * @param props - the slot's owner props (`wide`) plus the bound translator.
-     * @returns The action element.
-     */
-    function RefreshAction(props) {
-      const { wide = true, t } = props
-      const [busy, setBusy] = React.useState(false)
-      const restart = useRestartPhase()
-      const blocked = restart === 'restarting'
-      const timer = React.useRef(0)
-      React.useEffect(() => () => clearTimeout(timer.current), [])
-      const onClick = () => {
-        if (busy || blocked) return
-        setBusy(true)
-        timer.current = window.setTimeout(() => {
-          window.location.reload()
-        }, 120)
-      }
-      const label = blocked ? t('refreshBlocked') : busy ? t('reloading') : t('refresh')
-      return h(
-        'div',
-        { className: 'dsr-slot' },
-        h(
-          'button',
-          {
-            type: 'button',
-            className: 'dsr-btn',
-            'data-phase': blocked ? 'blocked' : busy ? 'restarting' : 'idle',
-            disabled: busy || blocked,
-            'aria-label': t('refresh'),
-            title: blocked ? t('refreshBlocked') : t('refreshHint'),
-            onClick,
-          },
-          h(RefreshIcon),
-          wide ? h('span', { className: 'dsr-text' }, label) : null,
-        ),
-      )
-    }
-
-    /**
      * Read the Host's restart status.
      *
      * @returns Parsed status, or `undefined` when the Host cannot be reached.
@@ -283,14 +237,57 @@ window.__ModuleLoader__.load({
     }
 
     /**
-     * The sidebar-foot action: one compact control, a second click to confirm.
+     * The reload button: one click reloads the page, no Host call.
      *
-     * @param props - the slot's owner props (`wide`) plus the bound translator.
-     * @returns The action element.
+     * This is the cheap half of the pair. A client plugin, a stylesheet, or a locale change
+     * arrives with the next page load, and reloading leaves the Host — and every running
+     * turn — untouched. It is disabled while the other button is restarting: the watchdog
+     * kills the application a moment after the Host answers, and a page reload racing that
+     * kill can leave the window blank until the relaunch wins.
+     *
+     * @param props - `wide` and the bound translator.
+     * @returns The button element.
      */
-    function RestartAction(props) {
+    function RefreshButton(props) {
       const { wide = true, t } = props
-      // The phase lives in the module store, not in this component: the reload action reads
+      const [busy, setBusy] = React.useState(false)
+      const restart = useRestartPhase()
+      const blocked = restart === 'restarting'
+      const timer = React.useRef(0)
+      React.useEffect(() => () => clearTimeout(timer.current), [])
+      const onClick = () => {
+        if (busy || blocked) return
+        setBusy(true)
+        timer.current = window.setTimeout(() => {
+          window.location.reload()
+        }, 120)
+      }
+      const label = blocked ? t('refreshBlocked') : busy ? t('reloading') : t('refresh')
+      return h(
+        'button',
+        {
+          type: 'button',
+          className: 'dsr-btn',
+          'data-phase': blocked ? 'blocked' : busy ? 'restarting' : 'idle',
+          disabled: busy || blocked,
+          'aria-label': t('refresh'),
+          title: blocked ? t('refreshBlocked') : t('refreshHint'),
+          onClick,
+        },
+        h(RefreshIcon),
+        wide ? h('span', { className: 'dsr-text' }, label) : null,
+      )
+    }
+
+    /**
+     * The restart button: one compact control, a second click to confirm.
+     *
+     * @param props - `wide` and the bound translator.
+     * @returns The button element.
+     */
+    function RestartButton(props) {
+      const { wide = true, t } = props
+      // The phase lives in the module store, not in this component: the reload button reads
       // the same value to disable itself while the kill is in flight.
       const phase = useRestartPhase()
       const [note, setNote] = React.useState('')
@@ -399,30 +396,50 @@ window.__ModuleLoader__.load({
                 : t('label')
 
       return h(
+        'button',
+        {
+          type: 'button',
+          className: 'dsr-btn',
+          'data-phase': phase,
+          disabled: phase === 'restarting',
+          'aria-label': t('label'),
+          title: note === '' ? t('hint') : note,
+          onClick,
+          onKeyDown,
+        },
+        h(RestartIcon),
+        wide || phase !== 'idle' ? h('span', { className: 'dsr-text' }, label) : null,
+      )
+    }
+
+    /**
+     * The single footer action holding both buttons.
+     *
+     * One registration, so the pair counts as one flex item in the host's footer and stays
+     * together even when another plugin adds its own footer button.
+     *
+     * @param props - the slot's owner props (`wide`) plus the bound translator.
+     * @returns The action element.
+     */
+    function DesktopActions(props) {
+      const { wide = true, t } = props
+      return h(
         'div',
-        { className: 'dsr-slot is-trailing' },
-        h(
-          'button',
-          {
-            type: 'button',
-            className: 'dsr-btn',
-            'data-phase': phase,
-            disabled: phase === 'restarting',
-            'aria-label': t('label'),
-            title: note === '' ? t('hint') : note,
-            onClick,
-            onKeyDown,
-          },
-          h(RestartIcon),
-          wide || phase !== 'idle' ? h('span', { className: 'dsr-text' }, label) : null,
-        ),
+        { className: 'dsr-group' },
+        h(RefreshButton, { wide, t }),
+        h(RestartButton, { wide, t }),
       )
     }
 
     return {
       inject: ['slots', 'locale'],
       /**
-       * Register the dictionaries, the component styles, and the sidebar-foot action.
+       * The components, exported so the smoke test can mount each button directly:
+       * mounting through the slot only reaches the `dsr-group` wrapper.
+       */
+      components: { DesktopActions, RefreshButton, RestartButton },
+      /**
+       * Register the dictionaries, the component styles, and the footer action.
        *
        * @param ctx - Browser plugin context.
        */
@@ -441,31 +458,18 @@ window.__ModuleLoader__.load({
         // No keyboard accelerator, by design. The Windows desktop shell hands shortcut
         // combinations to a trusted native bridge before page handlers run, so a page-level
         // listener here could never see them, and the product's own shortcut service would
-        // add a dependency this plugin does not otherwise need. The button is the way in.
+        // add a dependency this plugin does not otherwise need. The buttons are the way in.
         ctx.slots.inject('sidebar.footer.action', () =>
           ctx.slots.register(
             {
               name: 'sidebar.footer.action',
-              id: 'desktop-refresh',
+              id: 'desktop-actions',
               order: -110,
               label: () => t('refresh'),
               locale: NS,
               inject: () => ({ t }),
             },
-            RefreshAction,
-          ),
-        )
-        ctx.slots.inject('sidebar.footer.action', () =>
-          ctx.slots.register(
-            {
-              name: 'sidebar.footer.action',
-              id: 'desktop-restart',
-              order: -100,
-              label: () => t('label'),
-              locale: NS,
-              inject: () => ({ t }),
-            },
-            RestartAction,
+            DesktopActions,
           ),
         )
       },
