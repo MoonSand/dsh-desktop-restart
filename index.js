@@ -20,8 +20,8 @@
  * So the order is inverted: the helper first arms a *watchdog* through the Task
  * Scheduler, falls back to the shell (`explorer.exe` running a script-host watchdog),
  * and only kills the application once the watchdog has proven it is alive by touching a
- * marker file. Without that proof it refuses to kill anything. The watchdog waits for the
- * application to disappear and starts it again, so the timing of the kill does not matter.
+ * marker file. Without that proof it refuses to kill anything. The watchdog waits for
+ * the application to disappear and starts it again, so the timing of the kill does not matter.
  *
  * Every step is appended to a temporary log, which is the only evidence available after
  * such a restart.
@@ -59,8 +59,16 @@ const ARM_POLLS = 25
 /** After this long an unfinished restart no longer blocks a new attempt. */
 const RETRY_WINDOW_MS = 45_000
 
-/** How recently a profile manifest must have changed to look like an install in flight. */
-const INSTALL_WINDOW_MS = 30_000
+/**
+ * How recently a profile manifest must have changed to look like an install that
+ * *just finished*.
+ *
+ * Deliberately short: an install that completed more than this many seconds ago is
+ * over, and refusing a restart for longer only gets in the way. The "still running"
+ * case does not rely on this window — the plugin manager's install-state reports and
+ * the process probe cover it — so there is no reason to be generous here.
+ */
+const INSTALL_WINDOW_MS = 10_000
 
 /**
  * How long a reported install phase stays believable without a follow-up.
