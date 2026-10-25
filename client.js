@@ -94,6 +94,7 @@ window.__ModuleLoader__.load({
       stillAlive: '应用没有重启，请手动重启，或再点一次',
       notDesktop: '当前不是桌面端，改为刷新界面',
       unreachable: '联系不到 Host，改为刷新界面',
+      installing: '正在安装插件，完成后再试',
     }
     const en = {
       label: 'Restart app',
@@ -109,6 +110,7 @@ window.__ModuleLoader__.load({
       stillAlive: 'The app did not restart — restart it manually, or click again',
       notDesktop: 'Not the desktop app — reloading the page instead',
       unreachable: 'The Host did not answer — reloading the page instead',
+      installing: 'Installing plugins — try again when it finishes',
     }
 
     const CSS = `
@@ -347,6 +349,13 @@ window.__ModuleLoader__.load({
           return
         }
         const reason = answer.body?.reason
+        if (reason === 'installing') {
+          // Not a failure to fall back from: the Host is mid-install, so the page
+          // must stay put. The note explains it instead of reloading.
+          publishPhase('failed')
+          setNote(t('installing'))
+          return
+        }
         if (answer.status === 409 || reason === 'not-desktop') {
           reloadInsteadOfRestart(t('notDesktop'))
           return
