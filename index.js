@@ -29,7 +29,7 @@
  * @module @moonsand/dsh-desktop-restart
  */
 import { spawn } from 'node:child_process'
-import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -58,6 +58,9 @@ const ARM_POLLS = 25
 
 /** After this long an unfinished restart no longer blocks a new attempt. */
 const RETRY_WINDOW_MS = 45_000
+
+/** How recently a profile manifest must have changed to look like an install in flight. */
+const INSTALL_WINDOW_MS = 30_000
 
 /** Scheduled-task name used to escape the application's job object; deleted after the run. */
 const TASK_NAME = 'DSH-Desktop-Restart-Watchdog'
@@ -93,6 +96,32 @@ let restartingSince = 0
  */
 function restartInFlight() {
   return restartingSince !== 0 && Date.now() - restartingSince < RETRY_WINDOW_MS
+}
+
+/**
+ * Best-effort check for a package manager writing this profile right now.
+ *
+ * Killing the application mid-install can leave a half-written node_modules, so
+ * a restart is refused while a profile manifest looks freshly written. The
+ * profile location is not something a plugin is told about, so this stays
+ * deliberately fail-open: an unknown layout means "not busy" rather than
+ * "block every restart".
+ *
+ * @returns true when a manifest under the profile changed moments ago.
+ */
+export function installInProgress() {
+  const cwd = process.cwd()
+  const profile = process.env.DSH_PROFILE_DIR ?? (existsSync(join(cwd, 'pnpm-lock.yaml')) ? cwd : undefined)
+  if (profile === undefined) return false
+  const now = Date.now()
+  for (const manifest of [join(profile, 'pnpm-lock.yaml'), join(profile, 'node_modules', '.modules.yaml')]) {
+    try {
+      if (now - statSync(manifest).mtimeMs < INSTALL_WINDOW_MS) return true
+    } catch {
+      // A missing manifest simply does not vote.
+    }
+  }
+  return false
 }
 
 /**
@@ -557,6 +586,13 @@ async function handleRequest(ctx, request, response) {
   }
   if (!existsSync(executable)) {
     return reply(500, { ok: false, reason: 'missing-executable', message: executable })
+  }
+  if (installInProgress()) {
+    return reply(409, {
+      ok: false,
+      reason: 'installing',
+      message: 'A package manager is writing this profile right now; try again once the install finishes.',
+    })
   }
   if (restartInFlight()) {
     return reply(202, {
