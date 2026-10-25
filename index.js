@@ -62,6 +62,32 @@ const RETRY_WINDOW_MS = 45_000
 /** How recently a profile manifest must have changed to look like an install in flight. */
 const INSTALL_WINDOW_MS = 30_000
 
+/**
+ * How long a reported install phase stays believable without a follow-up.
+ *
+ * The plugin manager announces `installing`, `cancelling` and `applying`, but it
+ * never announces completion, so a phase that is never superseded has to expire
+ * on its own. Generous on purpose: a large download can take minutes, and the
+ * cost of waiting is a restart that is refused a little longer than needed.
+ */
+const INSTALL_PHASE_STALE_MS = 10 * 60_000
+
+/** Last install phase the plugin manager reported, and when it reported it. */
+let installPhase = ''
+let installPhaseSince = 0
+
+/**
+ * Record an install phase announced by the plugin manager.
+ *
+ * Exported so a test can drive the decision without a live plugin manager.
+ *
+ * @param phase - `installing`, `cancelling`, `applying`, or empty to clear.
+ */
+export function noteInstallPhase(phase) {
+  installPhase = typeof phase === 'string' ? phase : ''
+  installPhaseSince = Date.now()
+}
+
 /** Scheduled-task name used to escape the application's job object; deleted after the run. */
 const TASK_NAME = 'DSH-Desktop-Restart-Watchdog'
 
@@ -102,22 +128,27 @@ function restartInFlight() {
  * Best-effort check for a package manager writing this profile right now.
  *
  * Killing the application mid-install can leave a half-written node_modules, so
- * a restart is refused while an install is in flight. Two independent signals
- * cover two different windows, and neither alone is enough:
+ * a restart is refused while an install is in flight. Three independent signals
+ * cover three different windows, and none of them alone is enough:
  *
- * - A freshly written manifest catches the moment an install *finishes*, because
- *   a package manager writes the lockfile last.
- * - A live package-manager process catches an install that is *still running*,
- *   which the lockfile cannot show yet.
+ * 1. The plugin manager's own `plugin-manager/install-state` reports (`installing`,
+ *    `cancelling`, `applying`). This is the only signal that sees an install while
+ *    it is running, and it is authoritative — but it never reports completion, so
+ *    a stale phase has to expire.
+ * 2. A freshly written manifest catches the moment an install *finishes*, because
+ *    a package manager writes the lockfile last.
+ * 3. A live package-manager process is the fallback for when neither the event nor
+ *    the lockfile is available (older host, or a plain `pnpm add` by hand).
  *
  * The profile location is not something a plugin is told about, so this stays
- * deliberately fail-open: an unknown layout plus no visible install means "not
- * busy" rather than "block every restart".
+ * deliberately fail-open: nothing visible plus no report means "not busy" rather
+ * than "block every restart".
  *
  * @param processCheck - Package-manager probe; injectable so tests stay hermetic.
  * @returns true when an install looks in flight.
  */
 export async function installInProgress(processCheck = packageManagerRunning) {
+  if (installPhase !== '' && Date.now() - installPhaseSince < INSTALL_PHASE_STALE_MS) return true
   const cwd = process.cwd()
   const profile = process.env.DSH_PROFILE_DIR ?? (existsSync(join(cwd, 'pnpm-lock.yaml')) ? cwd : undefined)
   if (profile !== undefined) {
@@ -715,6 +746,12 @@ async function handleRequest(ctx, request, response) {
  * @param ctx - Host context.
  */
 export function apply(ctx) {
+  // The plugin manager announces its own install phases on this event. Subscribing
+  // is what lets a restart refuse while an install is *running*, instead of only
+  // once it has written the lockfile at the end.
+  ctx.on?.('plugin-manager/install-state', (progress) => {
+    noteInstallPhase(progress?.phase)
+  })
   ctx.effect(() =>
     ctx.webServer.register({
       kind: 'prefix',
