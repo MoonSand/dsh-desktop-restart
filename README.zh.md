@@ -18,7 +18,7 @@
 ## 环境要求
 
 - **仅 Windows**。重启链路建立在 Windows 计划任务与 Windows Script Host 之上。
-- DeepSeek Harness 桌面端 `0.2.1-rc.3`（实测）。其他版本未验证。
+- DeepSeek Harness 桌面端 `0.2.1-rc.2` 或更高（已在 `engines.dsh` 声明；实测 `0.2.1-rc.3`），Node `>=20`。
 - 无 npm 依赖。`index.js` 只用 Node 内置模块；`client.js` 只用外壳提供的 `react`。
 
 ## 安装
@@ -94,6 +94,7 @@ pnpm install
 ## 已知限制
 
 - **重启是硬杀**（`TerminateProcess`），正在进行的回合会中断。会话历史与已落盘内容不受影响。
+- **包管理器正在写 profile 时会拒绝重启**：lockfile 在最近 30 秒内被改过就回 `409 installing`。装到一半硬杀可能留下半写的 `node_modules`。该检查是尽力而为，定位不到 profile 时放行。
 - 只支持 Windows 桌面端。在普通 `dsh web` 下路由回 `409 not-desktop`，按钮退化为刷新页面。
 - 计划任务通道被策略禁用时，帮手会退化为直接启动 PowerShell，可能闪一下控制台窗口；日志标记 `(direct powershell)`。
 - 没有键盘快捷键。桌面端会把快捷键组合交给可信原生桥、在页面处理器之前拦截，页面级监听看不到；改走产品快捷键服务又会引入本插件并不需要的依赖。
@@ -102,6 +103,7 @@ pnpm install
 ## 开发
 
 ```powershell
+npm test          # 冒烟：生成器、安装保护、两个侧栏动作、PS 5.1 解析
 node --check index.js
 node --check client.js
 ```

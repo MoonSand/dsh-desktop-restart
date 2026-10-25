@@ -18,7 +18,7 @@ The production desktop shell ships no *Reload Page* menu item and no built-in ac
 ## Requirements
 
 - **Windows only.** The restart path is built on the Windows Task Scheduler and Windows Script Host.
-- DeepSeek Harness desktop `0.2.1-rc.3` (tested). Other builds are untested.
+- DeepSeek Harness desktop `0.2.1-rc.2` or newer (declared in `engines.dsh`; tested on `0.2.1-rc.3`), Node `>=20`.
 - No npm dependencies. `index.js` imports only Node built-ins; `client.js` imports `react`, provided by the shell.
 
 ## Install
@@ -94,6 +94,7 @@ Because the package declares a Host half, **Host changes need an app restart**; 
 ## Known limitations
 
 - **The restart is a hard kill** (`TerminateProcess`). The turn in flight is interrupted. Session history and anything already written to disk are unaffected.
+- **A restart is refused while a package manager is writing the profile**: a lockfile touched within the last 30 seconds answers `409 installing`. Killing the app mid-install can leave a half-written `node_modules`. The check is best-effort and fails open when the profile cannot be located.
 - Only the Windows desktop app is supported. On a plain `dsh web` Host the route answers `409 not-desktop` and the button falls back to reloading the page.
 - When the Scheduled Task channel is blocked by policy, the helper falls back to launching PowerShell directly, which may flash a console window; the log marks it `(direct powershell)`.
 - No keyboard accelerator. The desktop shell hands shortcut combinations to a trusted native bridge before page handlers run, so a page-level listener cannot see them; adding one through the product's shortcut service would pull in a dependency this plugin does not otherwise need.
@@ -102,6 +103,7 @@ Because the package declares a Host half, **Host changes need an app restart**; 
 ## Development
 
 ```powershell
+npm test          # smoke: builders, install guard, both sidebar actions, PS 5.1 parse
 node --check index.js
 node --check client.js
 ```
