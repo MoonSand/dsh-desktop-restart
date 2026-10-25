@@ -54,7 +54,7 @@ window.__ModuleLoader__.load({
     /**
      * Publish a phase to every mounted footer action.
      *
-     * @param next - One of `idle`, `confirm`, `restarting`, `failed`.
+     * @param next - One of `idle`, `confirm`, `restarting`, `blocked`, `failed`.
      */
     function publishPhase(next) {
       restartPhase.value = next
@@ -350,9 +350,10 @@ window.__ModuleLoader__.load({
         }
         const reason = answer.body?.reason
         if (reason === 'installing') {
-          // Not a failure to fall back from: the Host is mid-install, so the page
-          // must stay put. The note explains it instead of reloading.
-          publishPhase('failed')
+          // Not a failure: the Host refused on purpose because an install is running.
+          // `blocked` renders it as greyed-out rather than red, and the phase expires
+          // on its own so the button comes back without a retry.
+          publishPhase('blocked')
           setNote(t('installing'))
           return
         }
@@ -394,9 +395,11 @@ window.__ModuleLoader__.load({
             : t('confirm')
           : phase === 'restarting'
             ? t('restarting')
-            : phase === 'failed'
-              ? t('failed')
-              : t('label')
+            : phase === 'blocked'
+              ? t('installing')
+              : phase === 'failed'
+                ? t('failed')
+                : t('label')
 
       return h(
         'div',
