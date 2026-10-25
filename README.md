@@ -46,6 +46,16 @@ A package that is installed but **absent from `dsh.profile.bundles` silently doe
 
 The package ships its own `cordis.patch.yml`, which inserts the Host-side service, so no edit to the profile patch layer is needed.
 
+## Plugin market index (self-hosted)
+
+`market/index.json` in this repository is a **format 1 plugin market index**, validated by DSH's own `@deepseek-ai/dsh-plugin-market-index`. To see this plugin in the desktop app's **Plugins → Discover** tab:
+
+1. Push the repository to GitHub; the index URL is `https://raw.githubusercontent.com/MoonSand/dsh-desktop-restart/main/market/index.json` (GitHub Pages works too).
+2. Plugins → **Discover** → **Add index source**, then paste that https URL. Index sources accept `http:` / `https:` only, without credentials or a fragment.
+3. Cards show the bilingual title and description — the index stores `description` as an `{ "en": …, "zh": … }` object and **must contain `en`**; a Chinese-only value is rejected by the validator. Installing uses the exact npm version.
+
+Every version entry carries `engines.dsh` matching `package.json`; the Discover tab derives compatibility and the default version from it, and disables **Install** when no version is compatible. When publishing a new version, append a `versions` entry with `version`, the real publish time as Unix seconds in `publishTimestamp`, and `source.type: "npm"`.
+
 ## How the restart works
 
 Three platform facts shape the design, all measured on a real machine:
@@ -94,7 +104,7 @@ Because the package declares a Host half, **Host changes need an app restart**; 
 ## Known limitations
 
 - **The restart is a hard kill** (`TerminateProcess`). The turn in flight is interrupted. Session history and anything already written to disk are unaffected.
-- **A restart is refused while a package manager is writing the profile**: a lockfile touched within the last 30 seconds answers `409 installing`. Killing the app mid-install can leave a half-written `node_modules`. The check is best-effort and fails open when the profile cannot be located.
+- **A restart is refused while a package manager is installing into the profile** (`409 installing`). Two independent signals are checked: a lockfile or `node_modules/.modules.yaml` written within the last 30 seconds — which catches the moment an install *finishes*, since the lockfile is written last — and a live `node` process whose command line mentions `pnpm`, which catches an install that is *still running* before any lockfile exists. Both are best-effort and fail open.
 - Only the Windows desktop app is supported. On a plain `dsh web` Host the route answers `409 not-desktop` and the button falls back to reloading the page.
 - When the Scheduled Task channel is blocked by policy, the helper falls back to launching PowerShell directly, which may flash a console window; the log marks it `(direct powershell)`.
 - No keyboard accelerator. The desktop shell hands shortcut combinations to a trusted native bridge before page handlers run, so a page-level listener cannot see them; adding one through the product's shortcut service would pull in a dependency this plugin does not otherwise need.

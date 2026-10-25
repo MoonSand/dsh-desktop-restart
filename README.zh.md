@@ -46,6 +46,16 @@ pnpm install
 
 包自带 `cordis.patch.yml` 用于插入 Host 侧服务，所以不必改 profile 的补丁层。反过来说：**不要在 profile 的 `cordis.patch.yml` 里再写一份本插件的 insert** —— 那会让同一份客户端 bundle 被加载两次，抛 `duplicate factory registration` 并挡住启动。
 
+## 插件市场索引（自托管）
+
+仓库里的 `market/index.json` 是**格式 1 的插件市场索引**，由 DSH 自带的 `@deepseek-ai/dsh-plugin-market-index` 校验。想在本机「插件页 → 发现」里看到本插件：
+
+1. 把仓库推到 GitHub，索引地址即 `https://raw.githubusercontent.com/MoonSand/dsh-desktop-restart/main/market/index.json`（也可以走 GitHub Pages）。
+2. 插件页 → **发现** → **添加索引源**，粘贴该 https 地址。索引源只接受 `http:` / `https:`，且不能带凭据或片段。
+3. 卡片会显示中英双语的标题与描述（索引里的 `description` 是 `{ "en": …, "zh": … }` 对象，**必须含 `en`**，只写中文会被校验器拒绝），安装使用 npm 上的精确版本。
+
+每个版本条目都带 `engines.dsh` 且与 `package.json` 一致——发现页的兼容性与「默认版本」按它计算；没有兼容版本的插件，安装按钮是禁用的。新增版本时追加一条 `versions`：`version`、真实发布时间的 Unix 秒 `publishTimestamp`、`source.type: "npm"`。
+
 ## 重启是怎么实现的
 
 三条平台事实决定了这个设计，均在本机实测：
@@ -94,7 +104,7 @@ pnpm install
 ## 已知限制
 
 - **重启是硬杀**（`TerminateProcess`），正在进行的回合会中断。会话历史与已落盘内容不受影响。
-- **包管理器正在写 profile 时会拒绝重启**：lockfile 在最近 30 秒内被改过就回 `409 installing`。装到一半硬杀可能留下半写的 `node_modules`。该检查是尽力而为，定位不到 profile 时放行。
+- **包管理器正在往 profile 里装东西时拒绝重启**（`409 installing`）。两路独立信号都查：①lockfile 或 `node_modules/.modules.yaml` 在最近 30 秒内被写过——这抓的是安装**刚结束**那一刻（lockfile 是最后才写的）；②有命令行里带 `pnpm` 的 `node` 进程在跑——这抓的是安装**还在进行中**、lockfile 尚未出现的那段。两路都是尽力而为，判不出来就放行。
 - 只支持 Windows 桌面端。在普通 `dsh web` 下路由回 `409 not-desktop`，按钮退化为刷新页面。
 - 计划任务通道被策略禁用时，帮手会退化为直接启动 PowerShell，可能闪一下控制台窗口；日志标记 `(direct powershell)`。
 - 没有键盘快捷键。桌面端会把快捷键组合交给可信原生桥、在页面处理器之前拦截，页面级监听看不到；改走产品快捷键服务又会引入本插件并不需要的依赖。
