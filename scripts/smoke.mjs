@@ -142,7 +142,7 @@ if (process.platform === 'win32') {
 }
 
 // ---------------------------------------------------------------------------
-// 3. Client half: both sidebar actions still register, and the pair still
+// 3. Client half: both buttons live in one footer action, and the pair still
 //    behaves (reload disabled while a restart is in flight).
 // ---------------------------------------------------------------------------
 const clientSource = readFileSync(join(root, 'client.js'), 'utf8')
@@ -193,8 +193,9 @@ function mount(component, props) {
   const inst = { component, props, hooks: [], cursor: 0, cleanups: [], tree: null }
   render(inst)
   return {
+    // The mounted components return their element directly, so the tree *is* the button.
     get button() {
-      return inst.tree.props.children[0]
+      return inst.tree
     },
     unmount() {
       for (const cleanup of inst.cleanups) cleanup()
@@ -254,16 +255,23 @@ const ctx = {
 clientExports.apply(ctx)
 
 check(JSON.stringify(clientExports.inject) === JSON.stringify(['slots', 'locale']), 'the client must only need slots and locale')
-check(specs.length === 2, `expected 2 sidebar actions, got ${specs.length}`)
-
-const refreshSpec = specs.find((entry) => entry.spec.id === 'desktop-refresh')
-const restartSpec = specs.find((entry) => entry.spec.id === 'desktop-restart')
-check(refreshSpec?.spec.order === -110, 'reload must sort before restart')
-check(restartSpec?.spec.order === -100, 'restart order changed')
+// One merged registration: two actions would occupy two footer slots, which is what let a
+// third-party footer button push the pair onto separate lines.
+check(specs.length === 1, `expected 1 merged footer action, got ${specs.length}`)
+check(specs[0]?.spec.id === 'desktop-actions', 'the merged action id changed')
+check(specs[0]?.spec.order === -110, 'action order changed')
 
 const t = (key) => dictionary[key] ?? `<${key}>`
-const refresh = mount(refreshSpec.component, { wide: true, t })
-const restart = mount(restartSpec.component, { wide: true, t })
+const { DesktopActions, RefreshButton, RestartButton } = clientExports.components
+check(typeof DesktopActions === 'function' && typeof RefreshButton === 'function' && typeof RestartButton === 'function', 'the three components must be exported')
+
+const group = mount(DesktopActions, { wide: true, t })
+check(group.button.type === 'div', 'the merged action must wrap both buttons in a container')
+check(group.button.props.className === 'dsr-group', 'the wrapper class changed')
+check(group.button.props.children.length === 2, 'the wrapper must hold exactly two children')
+
+const refresh = mount(RefreshButton, { wide: true, t })
+const restart = mount(RestartButton, { wide: true, t })
 const idleTitle = String(refresh.button.props.title)
 
 check(idleTitle.length > 0, 'reload must have a tooltip')
