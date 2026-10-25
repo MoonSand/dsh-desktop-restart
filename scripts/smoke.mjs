@@ -104,7 +104,16 @@ if (process.platform === 'win32') {
 
     const lock = join(dir, 'pnpm-lock.yaml')
     writeFileSync(lock, 'lockfileVersion: 9\n')
-    check((await host.installInProgress(noManager)) === true, 'a fresh lockfile must look like an install in flight')
+    check((await host.installInProgress(noManager)) === true, 'a just-written lockfile must look like an install in flight')
+
+    // Pin the window boundary itself: 5 s is inside it, 11 s is outside.
+    const fiveSecondsAgo = new Date(Date.now() - 5_000)
+    utimesSync(lock, fiveSecondsAgo, fiveSecondsAgo)
+    check((await host.installInProgress(noManager)) === true, 'a lockfile 5 s old must still be inside the fresh window')
+
+    const elevenSecondsAgo = new Date(Date.now() - 11_000)
+    utimesSync(lock, elevenSecondsAgo, elevenSecondsAgo)
+    check((await host.installInProgress(noManager)) === false, 'a lockfile 11 s old is past the window and must not block')
 
     const past = new Date(Date.now() - 120_000)
     utimesSync(lock, past, past)
