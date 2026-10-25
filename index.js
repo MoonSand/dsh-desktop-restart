@@ -102,26 +102,35 @@ function restartInFlight() {
  * Best-effort check for a package manager writing this profile right now.
  *
  * Killing the application mid-install can leave a half-written node_modules, so
- * a restart is refused while a profile manifest looks freshly written. The
- * profile location is not something a plugin is told about, so this stays
- * deliberately fail-open: an unknown layout means "not busy" rather than
- * "block every restart".
+ * a restart is refused while an install is in flight. Two independent signals
+ * cover two different windows, and neither alone is enough:
  *
- * @returns true when a manifest under the profile changed moments ago.
+ * - A freshly written manifest catches the moment an install *finishes*, because
+ *   a package manager writes the lockfile last.
+ * - A live package-manager process catches an install that is *still running*,
+ *   which the lockfile cannot show yet.
+ *
+ * The profile location is not something a plugin is told about, so this stays
+ * deliberately fail-open: an unknown layout plus no visible install means "not
+ * busy" rather than "block every restart".
+ *
+ * @param processCheck - Package-manager probe; injectable so tests stay hermetic.
+ * @returns true when an install looks in flight.
  */
-export function installInProgress() {
+export async function installInProgress(processCheck = packageManagerRunning) {
   const cwd = process.cwd()
   const profile = process.env.DSH_PROFILE_DIR ?? (existsSync(join(cwd, 'pnpm-lock.yaml')) ? cwd : undefined)
-  if (profile === undefined) return false
-  const now = Date.now()
-  for (const manifest of [join(profile, 'pnpm-lock.yaml'), join(profile, 'node_modules', '.modules.yaml')]) {
-    try {
-      if (now - statSync(manifest).mtimeMs < INSTALL_WINDOW_MS) return true
-    } catch {
-      // A missing manifest simply does not vote.
+  if (profile !== undefined) {
+    const now = Date.now()
+    for (const manifest of [join(profile, 'pnpm-lock.yaml'), join(profile, 'node_modules', '.modules.yaml')]) {
+      try {
+        if (now - statSync(manifest).mtimeMs < INSTALL_WINDOW_MS) return true
+      } catch {
+        // A missing manifest simply does not vote.
+      }
     }
   }
-  return false
+  return processCheck()
 }
 
 /**
@@ -284,6 +293,62 @@ export function watchdogSource(executable, logPath, markerPath, mode) {
 function systemPowerShellPath() {
   const root = process.env.SystemRoot ?? 'C:\\Windows'
   return join(root, 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe')
+}
+
+/** Exit code the package-manager probe uses to report "an install is running". */
+const PROBE_BUSY_EXIT = 3
+
+/** How long the package-manager probe may take before it is treated as "not busy". */
+const PROBE_TIMEOUT_MS = 4000
+
+/**
+ * Whether a package manager is installing right now.
+ *
+ * The lockfile is written at the *end* of an install, so freshness alone cannot
+ * see an install that is still running — exactly the window where killing the
+ * app does the most damage. This asks the OS instead: a node process whose
+ * command line mentions pnpm is taken as an install in flight.
+ *
+ * The answer travels through the exit code rather than stdout on purpose: this
+ * sandbox refuses to spawn a child with piped stdio, and a probe that cannot
+ * run must read as "not busy" rather than as an error.
+ *
+ * @returns true when a package manager process is alive.
+ */
+function packageManagerRunning() {
+  return new Promise((resolve) => {
+    const query = [
+      "$busy = (Get-CimInstance Win32_Process -Filter \"Name='node.exe'\" |",
+      "  Where-Object { $_.CommandLine -match 'pnpm' } | Measure-Object).Count",
+      `if ($busy -gt 0) { exit ${PROBE_BUSY_EXIT} } else { exit 0 }`,
+    ].join('\n')
+    let settled = false
+    const finish = (busy) => {
+      if (settled) return
+      settled = true
+      resolve(busy)
+    }
+    let child
+    try {
+      child = spawn(systemPowerShellPath(), ['-NoProfile', '-NonInteractive', '-Command', query], {
+        stdio: 'ignore',
+        windowsHide: true,
+      })
+    } catch {
+      finish(false)
+      return
+    }
+    child.on('error', () => finish(false))
+    child.on('close', (code) => finish(code === PROBE_BUSY_EXIT))
+    setTimeout(() => {
+      try {
+        child.kill()
+      } catch {
+        // Already gone.
+      }
+      finish(false)
+    }, PROBE_TIMEOUT_MS)
+  })
 }
 
 /**
@@ -587,7 +652,7 @@ async function handleRequest(ctx, request, response) {
   if (!existsSync(executable)) {
     return reply(500, { ok: false, reason: 'missing-executable', message: executable })
   }
-  if (installInProgress()) {
+  if (await installInProgress()) {
     return reply(409, {
       ok: false,
       reason: 'installing',
