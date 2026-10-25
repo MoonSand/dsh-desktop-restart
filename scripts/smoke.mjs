@@ -88,8 +88,8 @@ if (process.platform === 'win32') {
 }
 
 // ---------------------------------------------------------------------------
-// 2. The install guard: two signals, fail-open, and it only trips when one of
-//    them actually says an install is in flight.
+// 2. The install guard: three signals, fail-open, and it only trips when one
+//    of them actually says an install is in flight.
 // ---------------------------------------------------------------------------
 {
   const dir = mkdtempSync(join(tmpdir(), 'dsh-restart-smoke-'))
@@ -116,6 +116,15 @@ if (process.platform === 'win32') {
 
     delete process.env.DSH_PROFILE_DIR
     check((await host.installInProgress(noManager)) === false, 'an unknown profile with no package manager must fail open')
+
+    // The plugin manager's own phase report is the most direct signal and must win
+    // even when nothing else shows an install.
+    host.noteInstallPhase('installing')
+    check((await host.installInProgress(noManager)) === true, 'a reported install phase must block')
+    host.noteInstallPhase('applying')
+    check((await host.installInProgress(noManager)) === true, 'an applying phase must block too')
+    host.noteInstallPhase('')
+    check((await host.installInProgress(noManager)) === false, 'a cleared phase must not block')
   } finally {
     if (previous === undefined) delete process.env.DSH_PROFILE_DIR
     else process.env.DSH_PROFILE_DIR = previous
