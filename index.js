@@ -20,8 +20,8 @@
  * So the order is inverted: the helper first arms a *watchdog* through the Task
  * Scheduler, falls back to the shell (`explorer.exe` running a script-host watchdog),
  * and only kills the application once the watchdog has proven it is alive by touching a
- * marker file. Without that proof it refuses to kill anything. The watchdog waits for
- * the application to disappear and starts it again, so the timing of the kill does not matter.
+ * marker file. Without that proof it refuses to kill anything. The watchdog waits for the
+ * application to disappear and starts it again, so the timing of the kill does not matter.
  *
  * Every step is appended to a temporary log, which is the only evidence available after
  * such a restart.
@@ -75,10 +75,25 @@ const INSTALL_WINDOW_MS = 10_000
  *
  * The plugin manager announces `installing`, `cancelling` and `applying`, but it
  * never announces completion, so a phase that is never superseded has to expire
- * on its own. Generous on purpose: a large download can take minutes, and the
- * cost of waiting is a restart that is refused a little longer than needed.
+ * on its own.
+ *
+ * The two limits differ by two orders of magnitude on purpose. `installing` covers
+ * the download, which can legitimately take minutes, so a long limit only risks
+ * refusing a restart that a little patience would allow. `applying` is the last,
+ * short stage — once it is over the install is done, and holding the guard for
+ * minutes afterwards would block every restart right after a successful install.
  */
 const INSTALL_PHASE_STALE_MS = 10 * 60_000
+const APPLYING_STALE_MS = 15_000
+
+/**
+ * How long the phase reported last still counts, given which phase it is.
+ *
+ * @returns Milliseconds the reported phase stays believable.
+ */
+function phaseStaleMs() {
+  return installPhase === 'applying' ? APPLYING_STALE_MS : INSTALL_PHASE_STALE_MS
+}
 
 /** Last install phase the plugin manager reported, and when it reported it. */
 let installPhase = ''
@@ -156,7 +171,7 @@ function restartInFlight() {
  * @returns true when an install looks in flight.
  */
 export async function installInProgress(processCheck = packageManagerRunning) {
-  if (installPhase !== '' && Date.now() - installPhaseSince < INSTALL_PHASE_STALE_MS) return true
+  if (installPhase !== '' && Date.now() - installPhaseSince < phaseStaleMs()) return true
   const cwd = process.cwd()
   const profile = process.env.DSH_PROFILE_DIR ?? (existsSync(join(cwd, 'pnpm-lock.yaml')) ? cwd : undefined)
   if (profile !== undefined) {
