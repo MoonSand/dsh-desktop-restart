@@ -23,6 +23,8 @@ window.__ModuleLoader__.load({
     const ARM_TIMEOUT_MS = 6000
     /** How long a restart may take before the button reports that nothing happened. */
     const WATCHDOG_MS = 20000
+    /** How long the button stays greyed out after a refused restart. */
+    const BLOCKED_MS = 3000
 
     /**
      * Restart phase shared by both buttons.
@@ -49,7 +51,14 @@ window.__ModuleLoader__.load({
       const spent = Date.now() - restartPhase.since
       if (restartPhase.value === 'restarting' && spent > WATCHDOG_MS + 5000) {
         restartPhase.value = 'idle'
-      } else if (restartPhase.value !== 'idle' && restartPhase.value !== 'restarting' && spent > ARM_TIMEOUT_MS + 2000) {
+      } else if (restartPhase.value === 'blocked' && spent > BLOCKED_MS) {
+        restartPhase.value = 'idle'
+      } else if (
+        restartPhase.value !== 'idle' &&
+        restartPhase.value !== 'restarting' &&
+        restartPhase.value !== 'blocked' &&
+        spent > ARM_TIMEOUT_MS + 2000
+      ) {
         restartPhase.value = 'idle'
       }
       return restartPhase.value
@@ -126,7 +135,7 @@ window.__ModuleLoader__.load({
 .dsr-btn:focus-visible{outline:2px solid var(--dsw-focus-ring-color,currentColor);outline-offset:2px}
 .dsr-btn[data-phase="confirm"]{color:var(--dsw-alias-state-error-primary,#d1453b);font-weight:600;background:var(--dsw-alias-interactive-bg-hover,rgba(127,127,127,.14))}
 .dsr-btn[data-phase="restarting"]{cursor:progress;opacity:.75}
-.dsr-btn[data-phase="blocked"]{cursor:not-allowed;opacity:.45}
+.dsr-btn[data-phase="blocked"]{color:var(--dsw-alias-state-error-primary,#d1453b);font-weight:600;background:var(--dsw-alias-interactive-bg-hover,rgba(127,127,127,.14));cursor:not-allowed}
 .dsr-btn[data-phase="failed"]{color:var(--dsw-alias-state-error-primary,#d1453b)}
 .dsr-icon{flex:none;display:block}
 .dsr-btn[data-phase="restarting"] .dsr-icon{animation:dsr-spin 1s linear infinite}
@@ -349,6 +358,13 @@ window.__ModuleLoader__.load({
         if (reason === 'installing') {
           publishPhase('blocked')
           setNote(t('installing'))
+          // A refusal schedules nothing else, and the phase is only re-read on the next
+          // render — without this timer the button would sit on "installing" until some
+          // unrelated interaction forced one. Clear it ourselves after BLOCKED_MS, but only
+          // if no newer phase replaced it meanwhile.
+          window.setTimeout(() => {
+            if (restartPhase.value === 'blocked') publishPhase('idle')
+          }, BLOCKED_MS)
           return
         }
         if (answer.status === 409 || reason === 'not-desktop') {
