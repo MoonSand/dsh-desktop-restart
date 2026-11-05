@@ -18,7 +18,7 @@
 ## 环境要求
 
 - **仅 Windows**。重启链路建立在 Windows 计划任务与 Windows Script Host 之上。
-- DeepSeek Harness 桌面端 `0.2.1-rc.2` 或更高（已在 `engines.dsh` 声明；实测 `0.2.1-rc.3`），Node `>=20`。
+- DeepSeek Harness 桌面端 `0.2.1-rc.2` 或更高（已在 `engines.dsh` 声明；实测 `0.2.2-rc.1`），Node `>=20`。
 - 无 npm 依赖。`index.js` 只用 Node 内置模块；`client.js` 只用外壳提供的 `react`。
 
 ## 安装
@@ -74,7 +74,7 @@ pnpm install
         -> launch.vbs 以 window style 0 隐藏启动 watchdog.ps1
       -> 帮手轮询 marker 文件（≤ 5 秒）确认看门狗活着
       -> 拿不到证据就中止，一个进程都不杀
-      -> 帮手退出 —— 它住在 job 里，绝不能自己动手杀
+      -> 帮手退出 —— 它住在 job 里，绝不会自己动手杀
   -> 看门狗（在 job 之外）：睡 1.2 秒 -> 杀掉该可执行文件的全部进程
       -> 等全部消失 -> 睡 0.6 秒 -> Start-Process 同一路径
       -> 回验是否起来了（最多 3 次，每次间隔 6 秒）-> 追加日志
@@ -99,7 +99,7 @@ pnpm install
 | `locale/*.json` | 插件页显示名与描述 |
 | `icon.svg` | 侧栏图标 |
 
-因为声明了 Host 半边，**Host 改动必须重启应用**；纯客户端改动只需刷新页面。
+因为声明了 Host 半边，**任何代码改动（包括只改 `client.js`）都要重启应用**才生效。`刷新界面` 只重载页面、不重建 Host 侧的 bundle 图，改过 `client.js` 之后再刷新，页面拿到的 bundle 与磁盘上的新文件对不上，会抛 `import failed` 并挡住启动——**改动后验证请一律走「重启应用」**。
 
 ## 已知限制
 
