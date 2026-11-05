@@ -18,7 +18,7 @@ The production desktop shell ships no *Reload Page* menu item and no built-in ac
 ## Requirements
 
 - **Windows only.** The restart path is built on the Windows Task Scheduler and Windows Script Host.
-- DeepSeek Harness desktop `0.2.1-rc.2` or newer (declared in `engines.dsh`; tested on `0.2.1-rc.3`), Node `>=20`.
+- DeepSeek Harness desktop `0.2.1-rc.2` or newer (declared in `engines.dsh`; tested on `0.2.2-rc.1`), Node `>=20`.
 - No npm dependencies. `index.js` imports only Node built-ins; `client.js` imports `react`, provided by the shell.
 
 ## Install
@@ -99,7 +99,7 @@ Client click
 | `locale/*.json` | Plugin page name and description |
 | `icon.svg` | Sidebar icon |
 
-Because the package declares a Host half, **Host changes need an app restart**; client-half changes only need a page reload.
+Because the package declares a Host half, **every code change — including one that only touches `client.js` — needs an app restart** to take effect. "Reload UI" only reloads the page; it does not rebuild the Host-side bundle graph, so reloading after editing `client.js` makes the page fetch a bundle that no longer matches the file on disk, which throws `import failed` and blocks startup. **Verify changes with "Restart app", never with a reload.**
 
 ## Known limitations
 
