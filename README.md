@@ -2,6 +2,8 @@
 
 English | [中文](README.zh.md)
 
+> **Deprecated — merged into `@moonsand/dsh-ui-optimize`.** Reload and restart now live in [dsh-ui-optimize](https://github.com/MoonSand/dsh-ui-optimize) → *Settings → UI Optimize → Desktop actions*, alongside the theme gallery and sidebar panel folding. Install `@moonsand/dsh-ui-optimize` instead; this package receives no further updates. Running both at once is harmless (the route prefixes differ) but pointless — uninstall this one.
+
 Two buttons in the sidebar foot of the **DeepSeek Harness desktop app**: reload the interface, or restart the entire application (app + Host).
 
 The production desktop shell ships no *Reload Page* menu item and no built-in accelerator for it, and it exposes no way to relaunch itself — `app.relaunch()` lives in the Electron main process and is wired only to crash recovery. This plugin adds both, as ordinary sidebar actions.
