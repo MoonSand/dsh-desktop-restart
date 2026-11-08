@@ -2,6 +2,8 @@
 
 [English](README.md) | 中文
 
+> **已停止维护 —— 功能并入 `@moonsand/dsh-ui-optimize`。** 刷新界面与重启应用现在在 [dsh-ui-optimize](https://github.com/MoonSand/dsh-ui-optimize) 的「设置 → 界面优化 → 桌面操作」里，跟主题画廊、侧栏面板收纳在同一个插件下。请改装 `@moonsand/dsh-ui-optimize`，本包不再更新。两个同时启用不会冲突（路由前缀已分开），但没必要——请卸载本包。
+
 给 **DeepSeek Harness 桌面端**侧栏底部加两个按钮：刷新界面，或重启整个应用（应用 + Host）。
 
 正式发布的桌面壳既没有「刷新页面」菜单，也没有内置快捷键，更没有重新拉起自己的入口 —— `app.relaunch()` 在 Electron 主进程里，只接到崩溃恢复。本插件把这两件事做成普通侧栏动作。
